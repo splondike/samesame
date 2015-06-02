@@ -46,7 +46,7 @@ printResults results = if allResultsSame then success else fail
       allResultsStr = concat (map (\(n, r) -> n ++ ": " ++ r) results)
 
 buildSSHCommand server =
-   concat ["ssh-keygen -lf /dev/stdin 2> /dev/null <<< \"$(ssh-keyscan ", server , ")\""]
+   concat ["ssh-keygen -lf /dev/stdin 2> /dev/null <<< \"$(ssh-keyscan ", server , ")\" | sort"]
 
 buildSSLCommand server =
    concat ["openssl s_client -servername ", server, " -connect ", server, ":443 </dev/null 2>/dev/null | openssl x509 -fingerprint -noout | grep -o -E '([0-9A-F]{2}:){19}[0-9A-F]{2}'"]
