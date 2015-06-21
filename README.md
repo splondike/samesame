@@ -17,11 +17,10 @@ Tor 1: 2048 d9:21:a6:1d:61:7d:3d:4f:fb:03:81:34:c0:04:b2:aa stefansk.name (RSA)
 Tor 2: 2048 d9:21:a6:1d:61:7d:3d:4f:fb:03:81:34:c0:04:b2:aa stefansk.name (RSA)
 Local: 2048 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 stefansk.name (RSA)
 ```
-
 ## Building
 
-Just use GHC (the Haskell compiler)
+Just run make.
 
-```shell
-ghc -o samesame samesame.hs
-```
+## Configuring
+
+Edit the default.conf file to add/edit commands and verifiers. The file should live in the same directory as the samesame executable.

@@ -3,20 +3,34 @@ import System.Environment (getArgs)
 import Control.Concurrent
 import Control.Concurrent.MVar
 import System.Process
-
-launchers = [("Tor 1", "TORSOCKS_CONF_FILE=torsocks-1.conf torsocks"), ("Tor 2", "TORSOCKS_CONF_FILE=torsocks-2.conf torsocks"), ("Local", "")]
+import Data.List (intercalate)
+import ConfigParser
 
 main = do
    args <- getArgs
-   result <- case args of
-              ("ssh":serverName:[]) -> run $ buildSSHCommand serverName
-              ("ssl":serverName:[]) -> run $ buildSSLCommand serverName
-              ("url":url:[]) -> run $ buildCurlHashCommand url
-              _ -> printUsage
+   config <- getConfig
+   result <- case makeCommand config args of
+                  Just cmd -> run config cmd
+                  Nothing -> printUsage config >> return False
    if result then exitSuccess else exitFailure
 
-run command = do
-   let prefixedCommands = map (\(n, p) -> (n, p ++ " " ++ command)) launchers
+makeCommand config args = requestedCommand >>= findCommand >>= commandStr
+   where
+      commandStr cmd = buildCommandString cmd (argpairs cmd)
+      argpairs cmd = zip (listArgs' cmd) (tail args)
+      listArgs' cmd = case listArgs cmd of
+                           Just names -> names
+                           Nothing -> []
+
+      findCommand name = safeHead $ filter ((==name) . commandName) $ getCommands config
+
+      requestedCommand = safeHead args
+      safeHead xs = if length xs > 0 then Just (head xs) else Nothing
+
+run config cmdStr = do 
+   let verifiers = getVerifiers config
+   let verifierPair = (\v -> (verifierName v, (verifierPrefix v) ++ " " ++ cmdStr))
+   let prefixedCommands = map verifierPair verifiers
    resultMVars <- mapM forkRunner prefixedCommands
    maybeResults <- mapM takeMVar resultMVars
    let unwrapped = sequence maybeResults
@@ -45,13 +59,13 @@ printResults results = if allResultsSame then success else fail
       firstResult = snd (head results)
       allResultsStr = concat (map (\(n, r) -> n ++ ": " ++ r) results)
 
-buildSSHCommand server =
-   concat ["ssh-keygen -lf /dev/stdin 2> /dev/null <<< \"$(ssh-keyscan ", server , ")\" | sort"]
-
-buildSSLCommand server =
-   concat ["openssl s_client -servername ", server, " -connect ", server, ":443 </dev/null 2>/dev/null | openssl x509 -fingerprint -noout | grep -o -E '([0-9A-F]{2}:){19}[0-9A-F]{2}'"]
-
-buildCurlHashCommand url =
-   concat ["curl -s ", url, " | sha256sum"]
-
-printUsage = putStrLn "Usage: hashcheck <https|ssh|url> <server.com|url>" >> return False
+printUsage config = putStrLn usageStr
+   where
+      usageStr = "Usage: samesame <" ++ summary ++ "> ...args...\ni.e.\n  samesame " ++ commandUsage
+      commandUsage = intercalate "\n  samesame " $ map args commands
+      args cmd = (commandName cmd) ++ " " ++ (intercalate " " $ listArgs' cmd)
+      listArgs' cmd = case listArgs cmd of 
+                           Just xs -> xs
+                           Nothing -> []
+      summary = intercalate "|" $ map commandName commands
+      commands = getCommands config
